@@ -1,0 +1,4 @@
+applicant_id,req_id,job_title,stage_reached,gender,race_ethnicity,age_band,ses_indicator,source,education_level,years_experience,application_date
+A000001,REQ-101,Program Coordinator,interviewed,Female,Hispanic or Latino,Under 40,First-generation college,Job board,Bachelor,3.5,2026-03-14
+A000002,REQ-101,Program Coordinator,applied,Male,White,40 and over,Not first-generation,Referral,Master,12,2026-03-15
+A000003,REQ-102,Data Analyst,hired,Prefer not to say,Unknown,Unknown,Unknown,Campus,Bachelor,1,2026-04-02

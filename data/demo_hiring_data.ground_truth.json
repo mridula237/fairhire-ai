@@ -1,0 +1,23 @@
+{
+  "n": 5000,
+  "seed": 42,
+  "base_rates": {
+    "screened": 0.45,
+    "interviewed": 0.4,
+    "offered": 0.35,
+    "hired": 0.8
+  },
+  "injected_disparities": [
+    {
+      "attribute": "race_ethnicity",
+      "group": "Hispanic or Latino",
+      "stage": "interviewed",
+      "multiplier": 0.65,
+      "expected_air": 0.65,
+      "realized_air_vs_rest": 0.613,
+      "realized_air_vs_highest": 0.524,
+      "group_n_at_stage": 434
+    }
+  ],
+  "note": "All other group-by-stage multipliers are 1.0 (no injected disparity)."
+}
