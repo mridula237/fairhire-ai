@@ -87,3 +87,13 @@ def test_funnel_and_intersection_shapes():
     x = audit_stage(df, "gender_x_race_ethnicity", "screened")
     assert "Female | Hispanic or Latino" in x.index
     assert "Unknown" in x.index
+
+
+def test_audit_by_req():
+    from fairhire.fairhire_stats import audit_by_req
+
+    df = generate(GeneratorConfig(n=5000, seed=42))
+    per = audit_by_req(df, "race_ethnicity")
+    assert set(per["req_id"]) <= set(df["req_id"])
+    assert per["req_id"].nunique() >= 5
+    assert {"stage", "air", "verdict"} <= set(per.columns)

@@ -291,6 +291,36 @@ def audit_funnel(
     return full
 
 
+def audit_by_req(
+    df: pd.DataFrame,
+    attribute: str,
+    reference: str = "highest",
+    min_n: int = schema.MIN_GROUP_N,
+    alpha: float = ALPHA,
+) -> pd.DataFrame:
+    """audit_funnel run separately for each requisition (req_id), stacked with a req_id column.
+    Each requisition is its own Holm family. Small requisitions mostly get 'no verdict' (n < min_n),
+    which is the honest answer; the pooled audit_funnel is the primary view."""
+    parts = []
+    for req, sub in df.groupby("req_id"):
+        stages = []
+        for st in schema.STAGES[1:]:
+            try:
+                stages.append(audit_stage(sub, attribute, st, reference, min_n, alpha))
+            except ValueError:  # no group with n >= min_n at this stage: nothing to compare
+                continue
+        if not stages:
+            continue
+        f = pd.concat(stages).rename_axis(attribute).reset_index()
+        _adjust(f)
+        f["verdict"] = [_verdict(r, alpha) for _, r in f.iterrows()]
+        f.insert(0, "req_id", req)
+        parts.append(f)
+    if not parts:
+        return pd.DataFrame()
+    return pd.concat(parts, ignore_index=True)
+
+
 SUMMARY_COLUMNS = [
     "stage", "n", "selected", "rate", "reference_rate", "air", "air_ci_low", "air_ci_high",
     "test", "p_value", "p_adjusted", "sd_units", "verdict", "note",
