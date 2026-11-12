@@ -3,3 +3,4 @@ numpy>=1.26
 scipy>=1.11
 streamlit>=1.45
 openpyxl>=3.1
+plotly>=5.20
