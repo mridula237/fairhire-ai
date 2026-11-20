@@ -98,3 +98,18 @@ def test_report_markdown_and_batch(tmp_path):
     assert list(df["file"]) == ["jd01.txt", "jd02.txt"]
     assert df.loc[0, "score"] < df.loc[1, "score"]
     assert flags["digital_native"] == 1
+
+
+def test_young_professionals_board_is_not_age_coded():
+    r = audit_jd("Manage the Young Professionals Board and staff its meetings. " * 3)
+    assert "young_team" not in {h.kind for h in r.flags}
+    r2 = audit_jd("We are hiring young professionals to join our team. " * 3)
+    assert "young_team" in {h.kind for h in r2.flags}
+
+
+def test_benefits_and_eeo_boilerplate_not_gender_coded():
+    r = audit_jd("Medical coverage for you and your dependents. Pay depending on experience. "
+                 "We welcome individuals with disabilities. We value dependable, independent people.")
+    assert "dependents" not in r.feminine and "depending" not in r.feminine
+    assert "individuals" not in r.masculine
+    assert "dependable" in r.feminine and "independent" in r.masculine  # real uses still count

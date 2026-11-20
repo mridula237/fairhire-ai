@@ -108,7 +108,7 @@ Everything is rule-based and explainable. Each highlight and each point lost tra
 
 ## Gender-coded wording
 
-FairHire uses the masculine- and feminine-coded word stems from Kat Matfield's Gender Decoder, which implement **Gaucher, Friesen & Kay (2011)**. That study found that masculine-coded job ads made jobs less appealing to women and lowered their sense of belonging. It did not find that the wording changed women's view of their own skills. A stem matches any word that begins with it; for example, *compet* matches competitive and competition. The stem lists are used as published, so results match the Gender Decoder. The only exceptions are a few unrelated words that happen to share a stem: kindergarten, committee, and Connecticut.
+FairHire uses the masculine- and feminine-coded word stems from Kat Matfield's Gender Decoder, which implement **Gaucher, Friesen & Kay (2011)**. That study found that masculine-coded job ads made jobs less appealing to women and lowered their sense of belonging. It did not find that the wording changed women's view of their own skills. A stem matches any word that begins with it; for example, *compet* matches competitive and competition. The stem lists are used as published, so results match the Gender Decoder. The only exceptions are a few unrelated words that happen to share a stem: kindergarten, committee, and Connecticut. Three more forms are excluded because postings use them in boilerplate with a different meaning: *dependents* ("coverage for your dependents"), *depending* ("depending on experience"), and *individuals* ("individuals with disabilities"). This was found while testing 10 real Chicago postings in Nov 2026.
 
 Rating:
 

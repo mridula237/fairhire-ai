@@ -48,7 +48,13 @@ FEMININE_STEMS = [
 ]
 # Words that start with a stem but are a different word entirely (not a judgment call about
 # context; the published lists are otherwise used as-is so results match the Gender Decoder).
-STEM_EXCEPTIONS = {"kindergarten", "kindergartens", "committee", "committees", "connecticut"}
+STEM_EXCEPTIONS = {
+    "kindergarten", "kindergartens", "committee", "committees", "connecticut",
+    # benefits / EEO boilerplate where the word means something else:
+    "dependents",   # "coverage for you and your dependents" (not "dependable")
+    "depending",    # "pay depending on experience"
+    "individuals",  # "individuals with disabilities" = people (not "individualistic")
+}
 
 PAY_PATTERNS = [
     r"\$\s?\d[\d,]*(\.\d+)?\s*(k|K)?\s*(-|–|—|to)\s*\$?\s?\d[\d,]*",  # $50,000 - $60,000 / $25-$30

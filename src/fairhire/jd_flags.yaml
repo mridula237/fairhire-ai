@@ -24,7 +24,7 @@ flags:
   - id: young_team
     category: age-coded
     severity: high
-    patterns: ["young,? (?:and )?(?:dynamic|energetic|vibrant|hungry),? (?:and )?(?:dynamic|energetic|vibrant)?,? ?team", "young team", "young professionals?", "youthful"]
+    patterns: ["young,? (?:and )?(?:dynamic|energetic|vibrant|hungry),? (?:and )?(?:dynamic|energetic|vibrant)?,? ?team", "young team", "young professionals?(?! (?:board|network|group|committee|council|society|club|program))", "youthful"]
     why: "Age-coded language can signal that applicants 40 and over are unwelcome (ADEA)."
     suggestion: "Describe the team's work, not its age: 'a collaborative, fast-moving team'."
   - id: recent_grad
