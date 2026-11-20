@@ -1,0 +1,24 @@
+# Fly.io config. App name must be globally unique: change it if `fly launch` says it's taken.
+app = "fairhire-ai"
+primary_region = "ord"  # Chicago
+
+[build]
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"   # always on: no cold starts (what ChiEAC asked for)
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "20s"
+    interval = "30s"
+    method = "GET"
+    path = "/_stcore/health"
+    timeout = "5s"
+
+[[vm]]
+  memory = "512mb"   # ~240 MB used today; raise to "1gb" when Module 3 (ML) lands
+  cpu_kind = "shared"
+  cpus = 1

@@ -4,3 +4,5 @@ scipy>=1.11
 streamlit>=1.45
 openpyxl>=3.1
 plotly>=5.20
+python-docx>=1.1
+pyyaml>=6.0

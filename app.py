@@ -20,6 +20,7 @@ from fairhire.ingest import (  # noqa: E402
     unmapped_stage_values,
     validate,
 )
+from fairhire.jd_audit import audit_jd, highlighted_html, read_docx, report_markdown  # noqa: E402
 from fairhire.make_demo_data import GeneratorConfig, generate  # noqa: E402
 
 DISCLAIMER = (
@@ -96,8 +97,104 @@ def chi_square_by_stage(df: pd.DataFrame, attribute: str, reference: str) -> dic
 # ---------------------------------------------------------------------------
 
 st.title("FairHire AI")
-st.caption(f"v{__version__} · Open-source hiring funnel disparity audit · Built with the Chicago Education "
+st.caption(f"v{__version__} · Open-source hiring equity audit · Built with the Chicago Education "
            "Advocacy Cooperative (ChiEAC)")
+MODULES = ["Hiring funnel audit", "Job description audit"]
+module = st.radio("Choose a check", MODULES, horizontal=True, label_visibility="collapsed")
+
+EXAMPLE_JD = """Data Analyst (example posting, fictional)
+
+We're a young, energetic team looking for a rockstar Data Analyst who is competitive, driven and ready to \
+dominate our reporting. You'll lead analytics for our programs.
+
+What you'll do
+- Build dashboards and own our KPIs
+- Work hard, play hard in a fast-paced, high-pressure environment
+- Be a culture fit with our hard-charging team
+
+What you need
+- Bachelor's degree required
+- Must be a digital native
+- Native English speaker
+- Must be able to lift 25 lbs
+- Valid driver's license required
+
+He will report to the Director of Operations."""
+
+
+def render_jd_audit() -> None:
+    st.markdown("Check a job posting for **gender-coded words**, **age-coded and exclusionary phrases**, "
+                "**reading level**, and a **missing pay range**, and get suggested rewrites.")
+    src_col, up_col = st.columns([2, 1])
+    with up_col:
+        jd_file = st.file_uploader("…or upload a posting (.txt or .docx)", type=["txt", "docx"])
+        if st.button("Try an example posting"):
+            st.session_state["jd_text"] = EXAMPLE_JD
+    if jd_file is not None and st.session_state.get("jd_file_id") != jd_file.file_id:
+        data = jd_file.getvalue()
+        st.session_state["jd_file_id"] = jd_file.file_id  # load once per file, so later edits stick
+        st.session_state["jd_text"] = (read_docx(data) if jd_file.name.lower().endswith(".docx")
+                                       else data.decode("utf-8", errors="replace"))
+    with src_col:
+        text = st.text_area("Paste the job description", key="jd_text", height=260,
+                            placeholder="Paste the full posting: title, responsibilities, requirements, pay.")
+    if not text or len(text.split()) < 20:
+        st.info("Paste or upload a posting (at least a few sentences) to see results.")
+        return
+
+    r = audit_jd(text)
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("JD Equity Score", f"{r.score}/100")
+    coding = r.gender_coding
+    m2.metric("Gender coding", coding.replace("strongly ", "").replace("-coded", "").capitalize(),
+              delta="strongly coded" if coding.startswith("strongly") else None, delta_color="off")
+    m3.metric("Reading level", f"Grade {r.readability['fk_grade']}")
+    m4.metric("Pay range listed", "Yes" if r.has_pay_range else "No")
+
+    if r.deductions:
+        st.markdown("**Why points were taken off**")
+        for d, p in r.deductions:
+            st.markdown(f"- {d} **(−{p})**")
+    else:
+        st.success("No issues found. Nice posting.")
+    if not r.has_pay_range:
+        st.warning("Illinois employers with 15+ employees must include the pay scale and a general description "
+                   "of benefits in job postings (since Jan 1, 2025).")
+
+    left, right = st.columns(2)
+    with left:
+        st.subheader("Your posting")
+        st.caption("Hover a highlight to see why. 🟦 masculine-coded · 🟪 feminine-coded · 🟥 high · 🟧 medium · "
+                   "⬜ low severity")
+        st.html(highlighted_html(r))
+    with right:
+        st.subheader("Suggested version")
+        st.caption("Safe word swaps are applied automatically. Flags that need judgment are listed below. "
+                   "Edit freely, then download.")
+        new_text = st.text_area("Suggested version", r.rewrite, height=420, label_visibility="collapsed")
+        st.download_button("Download suggested version (.txt)", new_text.encode(), file_name="job_posting_revised.txt")
+
+    if r.flags:
+        st.subheader(f"Flagged phrases ({len(r.flags)})")
+        st.dataframe(
+            pd.DataFrame([{"Phrase": h.text, "Category": h.category, "Severity": h.severity, "Why": h.why,
+                           "Suggestion": h.suggestion} for h in r.flags]),
+            hide_index=True, width="stretch",
+        )
+    st.markdown(f"**Gender-coded words.** Masculine: {', '.join(sorted(set(r.masculine))) or 'none'} · "
+                f"Feminine: {', '.join(sorted(set(r.feminine))) or 'none'}")
+    st.caption("Word lists from the Gender Decoder (Matfield), based on Gaucher, Friesen & Kay (2011). Research "
+               "found masculine-coded ads made jobs less appealing to women. Coding is about the overall mix, "
+               "not any single word.")
+    st.download_button("Download full report (.md)", report_markdown(r).encode(), file_name="jd_audit_report.md")
+    st.divider()
+    st.caption("Lead developer: Mridula Kalaiselvan · MIT License · " + DISCLAIMER)
+
+
+if module == MODULES[1]:
+    render_jd_audit()
+    st.stop()
+
 st.markdown(
     "See **where** your hiring funnel treats groups differently: at which step, for which groups, how big the "
     "gap is, and whether it's statistically meaningful."

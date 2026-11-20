@@ -97,3 +97,82 @@ Checked across 20 random demo datasets: the injected gap was found 20/20 times, 
 - Wilson, E. B. (1927). Probable inference, the law of succession, and statistical inference. *JASA* 22(158).
 - Katz, D., et al. (1978). Obtaining confidence intervals for the risk ratio in cohort studies. *Biometrics* 34(3).
 - Holm, S. (1979). A simple sequentially rejective multiple test procedure. *Scandinavian Journal of Statistics* 6(2).
+
+---
+
+# Module 2: Job Description Language Audit (v0.2)
+
+Code: `src/fairhire/jd_audit.py`. Flag dictionary: `src/fairhire/jd_flags.yaml`. Tests: `tests/test_jd_audit.py`. Batch scoring: `python -m fairhire.jd_batch <folder>`.
+
+Everything is rule-based and explainable. Each highlight and each point lost traces back to a specific phrase.
+
+## Gender-coded wording
+
+FairHire uses the masculine- and feminine-coded word stems from Kat Matfield's Gender Decoder, which implement **Gaucher, Friesen & Kay (2011)**. That study found that masculine-coded job ads made jobs less appealing to women and lowered their sense of belonging. It did not find that the wording changed women's view of their own skills. A stem matches any word that begins with it; for example, *compet* matches competitive and competition. The stem lists are used as published, so results match the Gender Decoder. The only exceptions are a few unrelated words that happen to share a stem: kindergarten, committee, and Connecticut.
+
+Rating:
+
+| Difference (masculine − feminine) | Rating |
+|---|---|
+| 3 or more | strongly masculine-coded |
+| 1 to 2 | masculine-coded |
+| 0 | neutral |
+| −1 to −2 | feminine-coded |
+| −3 or less | strongly feminine-coded |
+
+## Flag dictionary
+
+The YAML file defines 18 flags in 6 categories:
+
+| Category | Examples |
+|---|---|
+| Age-coded | "digital native", "young team", "recent grads only", experience caps |
+| Exclusionary | "culture fit", "rockstar", "native English speaker", "U.S. citizens only", gendered pronouns and titles, grooming rules |
+| Disability | Lifting or standing requirements without an accommodation statement, driver's license requirements |
+| Credential | "Degree required" with no "or equivalent experience" |
+| Legal | Criminal-history screens in the posting |
+
+Each flag carries a severity, a plain-language reason, and a suggested fix. Severity:
+- **High:** likely to screen people out on a protected trait, or raises legal risk.
+- **Medium:** known to discourage some groups.
+- **Low:** a style or clarity issue.
+
+## Pay transparency
+
+Since Jan 1, 2025, Illinois employers with 15 or more employees must include the pay scale and a general description of benefits in job postings (Illinois Equal Pay Act, 820 ILCS 112/10(b-25)). FairHire detects a pay range with patterns such as "$X–$Y" and "$X per hour", and detects benefits with keywords.
+
+## Readability
+
+FairHire computes the **Flesch–Kincaid grade level** and the **Flesch reading ease** score with a built-in heuristic syllable counter, so nothing has to be downloaded at runtime. Bullet lines count as sentences. FairHire suggests grade 10 or below.
+
+## JD Equity Score (0–100)
+
+The score starts at 100, and every deduction is itemized in the app and in the downloadable report.
+
+| Issue | Deduction | Cap |
+|---|---|---|
+| Each flagged phrase | high −12, medium −6, low −3 | −45 total |
+| Masculine-coded wording outweighs feminine-coded by 3 or more | −3 per word of imbalance | −15 |
+| Reading grade above 10 | −2 per grade | −15 |
+| No pay range | −10 | |
+| Pay range listed but no benefits | −3 | |
+| Over 900 words | −5 | |
+
+The weights are a transparent design choice, not a validated psychometric scale. The score helps compare drafts and postings. It does not measure legal compliance.
+
+## Suggested rewrite
+
+The rewrite applies only the word-level swaps marked `replace:` in the YAML, such as "rockstar" → "skilled" and "culture fit" → "culture add". It also adds "or equivalent experience" to a degree requirement. Flags that need human judgment, such as pronouns, physical requirements, and citizenship, are left in place and listed for review.
+
+## Limitations
+
+- Word lists can't read context. "Lead" in "lead paint abatement" still counts as masculine-coded.
+- The research on gendered wording is about **appeal to applicants**. It doesn't show that any single word is discriminatory.
+- Flags point to risk; they are not legal conclusions. Some requirements, such as lifting or citizenship, may be legitimate and legally required for a specific job.
+
+## References
+
+- Gaucher, D., Friesen, J., & Kay, A. C. (2011). Evidence that gendered wording in job advertisements exists and sustains gender inequality. *Journal of Personality and Social Psychology*, 101(1), 109–128.
+- Matfield, K. Gender Decoder (MIT License). https://github.com/lovedaybrooke/gender-decoder
+- Kincaid, J. P., et al. (1975). Derivation of new readability formulas for Navy enlisted personnel. Naval Technical Training Command.
+- Illinois Department of Labor, Pay Transparency: https://labor.illinois.gov/pay

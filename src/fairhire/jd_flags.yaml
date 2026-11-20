@@ -1,0 +1,132 @@
+# FairHire AI: job-description flag dictionary.
+#
+# Each flag: id, category, severity (high | medium | low), patterns (case-insensitive regex,
+# matched on word boundaries unless the pattern says otherwise), why (plain-language reason),
+# suggestion (what to write instead), and optional replace (safe word-level substitution used
+# in the suggested rewrite; omit when the fix needs human judgment).
+#
+# Severity guide:
+#   high   = likely to screen people out on a protected trait or raise legal risk
+#   medium = known to discourage some groups from applying
+#   low    = style issue that hurts clarity or inclusiveness
+#
+# This is a starting dictionary, not an exhaustive or legal list. Add flags with a PR.
+
+flags:
+  # ---- Age-coded -----------------------------------------------------------
+  - id: digital_native
+    category: age-coded
+    severity: high
+    patterns: ["(?:an? )?digital natives?"]
+    why: "Describes a generation, not a skill. Signals that older applicants aren't wanted (ADEA protects 40+)."
+    suggestion: "Name the skill: 'comfortable with digital tools such as ...'"
+    replace: "comfortable with digital tools"
+  - id: young_team
+    category: age-coded
+    severity: high
+    patterns: ["young,? (?:and )?(?:dynamic|energetic|vibrant|hungry),? (?:and )?(?:dynamic|energetic|vibrant)?,? ?team", "young team", "young professionals?", "youthful"]
+    why: "Age-coded language can signal that applicants 40 and over are unwelcome (ADEA)."
+    suggestion: "Describe the team's work, not its age: 'a collaborative, fast-moving team'."
+  - id: recent_grad
+    category: age-coded
+    severity: medium
+    patterns: ["recent (college )?grad(uate)?s?( only)?", "new grads? only", "class of 20\\d\\d"]
+    why: "Restricting to recent graduates screens out older career-changers."
+    suggestion: "Say 'early-career' or list the actual skills needed."
+  - id: max_years
+    category: age-coded
+    severity: medium
+    patterns: ["(no more than|maximum of|max\\.?|up to) \\d+\\+? years('|’)? (of )?experience", "\\d+\\s*-\\s*\\d+ years('|’)? experience only"]
+    why: "Capping experience can screen out older applicants."
+    suggestion: "State a minimum if needed; drop the maximum."
+  - id: energetic
+    category: age-coded
+    severity: low
+    patterns: ["high[- ]energy", "energetic"]
+    why: "Often read as code for 'young'."
+    suggestion: "Describe the pace of the work instead: 'a role with frequent deadlines'."
+    replace: "motivated"
+
+  # ---- Exclusionary / jargon ----------------------------------------------
+  - id: culture_fit
+    category: exclusionary
+    severity: medium
+    patterns: ["culture fit", "cultural fit", "fit (in|with) our culture"]
+    why: "'Fit' invites hiring people who resemble the current team."
+    suggestion: "Say 'culture add' or name the values: 'shares our commitment to ...'."
+    replace: "culture add"
+  - id: rockstar
+    category: exclusionary
+    severity: low
+    patterns: ["rock ?stars?", "ninjas?", "gurus?", "superstars?", "unicorns?", "jedi", "wizards?"]
+    why: "Hype jargon reads as masculine-coded and vague; it discourages qualified applicants who don't self-describe that way."
+    suggestion: "Use a plain title: 'skilled', 'experienced', 'expert'."
+    replace: "skilled"
+  - id: work_hard_play_hard
+    category: exclusionary
+    severity: medium
+    patterns: ["work hard,? play hard", "fast[- ]paced,? high[- ]pressure"]
+    why: "Signals long hours; discourages caregivers and people with disabilities."
+    suggestion: "Be specific about schedule and workload."
+  - id: native_speaker
+    category: exclusionary
+    severity: high
+    patterns: ["native (english|spanish) speakers?", "english as (a|your) first language", "mother tongue"]
+    why: "Native-speaker requirements can be national-origin discrimination (Title VII). Fluency is what matters."
+    suggestion: "Say 'fluent in English (written and spoken)'."
+    replace: "fluent English speaker"
+  - id: citizens_only
+    category: exclusionary
+    severity: high
+    patterns: ["u\\.?s\\.? citizens? only", "must be an? (u\\.?s\\.? )?citizen", "green card holders? only"]
+    why: "Citizenship-only requirements can be unlawful (INA anti-discrimination) unless required by law, regulation, or government contract."
+    suggestion: "Use 'must be authorized to work in the U.S.' unless citizenship is legally required."
+  - id: gendered_pronoun
+    category: exclusionary
+    severity: medium
+    patterns: ["\\bhe or she\\b", "\\bs/he\\b", "\\bhe/she\\b", "\\bhis/her\\b", "\\bhe will\\b", "\\bhis (role|responsibilit)", "\\bshe will\\b"]
+    why: "Gendered or binary pronouns exclude some applicants."
+    suggestion: "Use 'you' or 'they'."
+  - id: gendered_title
+    category: exclusionary
+    severity: medium
+    patterns: ["salesman", "foreman", "chairman", "waitress", "cameraman", "craftsman", "workmen", "manpower"]
+    why: "Gendered job titles signal who the employer expects to hire."
+    suggestion: "Use neutral titles: salesperson, supervisor, chair, server, camera operator."
+  - id: clean_shaven
+    category: exclusionary
+    severity: high
+    patterns: ["clean[- ]shaven", "no (beards|dreadlocks|braids)", "professional hair(style)?"]
+    why: "Grooming rules can discriminate on religion or race (Illinois CROWN Act protects hairstyles)."
+    suggestion: "Remove, or state a specific safety requirement and accommodation process."
+
+  # ---- Physical / disability ----------------------------------------------
+  - id: lift_requirement
+    category: disability
+    severity: medium
+    patterns: ["(must be able to |ability to )?lift (up to )?\\d+ ?(lbs?|pounds)", "stand for (long|extended) periods", "able[- ]bodied"]
+    why: "Physical requirements should be essential to the job and paired with an accommodation statement (ADA)."
+    suggestion: "Keep only if essential, and add: 'with or without reasonable accommodation'."
+  - id: drivers_license
+    category: disability
+    severity: low
+    patterns: ["valid driver('|’)?s licen[cs]e (is )?required", "must have (a )?(valid )?driver('|’)?s licen[cs]e"]
+    why: "Excludes people who can't drive (including some disabilities) when driving isn't essential."
+    suggestion: "Require 'reliable transportation' unless the job is driving."
+
+  # ---- Credential inflation -------------------------------------------------
+  - id: degree_required
+    category: credential
+    severity: medium
+    patterns: ["bachelor('|’)?s degree (is )?required", "(4|four)[- ]year degree required", "degree required", "must have a (bachelor|college)('|’)?s? degree"]
+    why: "Degree requirements screen out qualified people, disproportionately Black and Hispanic workers, when the job doesn't need one."
+    suggestion: "Add 'or equivalent experience' unless a degree is legally required."
+    unless: "equivalent (work )?experience|or equivalent|or comparable experience"
+
+  # ---- Criminal history -----------------------------------------------------
+  - id: criminal_history
+    category: legal
+    severity: high
+    patterns: ["no (felonies|felony convictions|criminal record)", "clean (criminal )?(background|record)", "never been convicted"]
+    why: "Illinois limits criminal-history questions before an interview (Job Opportunities for Qualified Applicants Act) and blanket bans can have disparate impact."
+    suggestion: "Remove from the posting; follow an individualized assessment after a conditional offer."
