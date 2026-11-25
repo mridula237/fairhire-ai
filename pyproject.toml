@@ -1,6 +1,6 @@
 [project]
 name = "fairhire-ai"
-version = "0.2.0"
+version = "0.3.0"
 description = "Open-source hiring funnel disparity audit (ChiEAC)"
 requires-python = ">=3.11"
 license = { text = "MIT" }

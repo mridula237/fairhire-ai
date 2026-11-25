@@ -85,6 +85,10 @@ REQUISITIONS = [
 ]
 
 
+REFERRAL_SHARE_WHITE, REFERRAL_SHARE_OTHER = 0.35, 0.07
+REFERRAL_SCREEN_BOOST = 1.8
+
+
 @dataclass(frozen=True)
 class Disparity:
     attribute: str      # e.g. "race_ethnicity"
@@ -116,6 +120,10 @@ class GeneratorConfig:
     start_date: date = date(2025, 1, 1)
     end_date: date = date(2026, 9, 30)
     disparities: list[Disparity] = field(default_factory=lambda: list(DEFAULT_DISPARITIES))
+    # Proxy scenario for Module 3 (off by default so Module 1 ground truth is unchanged):
+    # White applicants get referrals far more often, and past screeners favored referrals.
+    # Race is never a model feature, but "source" carries it in.
+    referral_proxy: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -154,6 +162,15 @@ def generate(config: GeneratorConfig | None = None) -> pd.DataFrame:
         }
     )
 
+    if cfg.referral_proxy:
+        white = (df["race_ethnicity"] == "White").to_numpy()
+        p_ref = np.where(white, REFERRAL_SHARE_WHITE, REFERRAL_SHARE_OTHER)
+        is_ref = rng.random(n) < p_ref
+        others = [k for k in SOURCE_SHARES if k != "Referral"]
+        w = np.array([SOURCE_SHARES[k] for k in others])
+        df.loc[is_ref, "source"] = "Referral"
+        df.loc[~is_ref, "source"] = rng.choice(others, size=int((~is_ref).sum()), p=w / w.sum())
+
     # Qualification factor: identical distribution across groups (no confounding).
     exp_factor = 0.9 + 0.2 * np.clip(df["years_experience"].to_numpy() / 10.0, 0, 1)
     qual = df["education_level"].map(EDU_FACTOR).to_numpy() * exp_factor
@@ -167,7 +184,10 @@ def generate(config: GeneratorConfig | None = None) -> pd.DataFrame:
     reached = np.zeros(n, dtype=int)  # index into schema.STAGES; 0 = applied
     alive = np.ones(n, dtype=bool)
     for k, stage in enumerate(schema.STAGES[1:], start=1):
-        p = np.clip(BASE_RATES[stage] * qual * mult[stage], 0, 0.98)
+        boost = 1.0
+        if cfg.referral_proxy and stage == "screened":
+            boost = np.where(df["source"].to_numpy() == "Referral", REFERRAL_SCREEN_BOOST, 1.0)
+        p = np.clip(BASE_RATES[stage] * qual * mult[stage] * boost, 0, 0.98)
         passed = alive & (rng.random(n) < p)
         reached[passed] = k
         alive = passed

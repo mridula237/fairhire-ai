@@ -10,7 +10,13 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from fairhire import __version__, schema  # noqa: E402
-from fairhire.charts import air_heatmap, funnel_chart  # noqa: E402
+from fairhire.charts import (  # noqa: E402
+    air_heatmap,
+    funnel_chart,
+    model_vs_history_chart,
+    shap_by_group_chart,
+    shap_global_chart,
+)
 from fairhire.fairhire_stats import add_intersection, audit_funnel, audit_stage  # noqa: E402
 from fairhire.ingest import (  # noqa: E402
     apply_mapping,
@@ -99,7 +105,7 @@ def chi_square_by_stage(df: pd.DataFrame, attribute: str, reference: str) -> dic
 st.title("FairHire AI")
 st.caption(f"v{__version__} · Open-source hiring equity audit · Built with the Chicago Education "
            "Advocacy Cooperative (ChiEAC)")
-MODULES = ["Hiring funnel audit", "Job description audit"]
+MODULES = ["Hiring funnel audit", "Job description audit", "Model fairness check"]
 module = st.radio("Choose a check", MODULES, horizontal=True, label_visibility="collapsed")
 
 EXAMPLE_JD = """Data Analyst (example posting, fictional)
@@ -191,8 +197,108 @@ def render_jd_audit() -> None:
     st.caption("Lead developer: Mridula Kalaiselvan · MIT License · " + DISCLAIMER)
 
 
+@st.cache_data(show_spinner="Training the diagnostic model (about 10 seconds)…")
+def cached_model_check(df: pd.DataFrame, attribute: str, target: str, features: tuple[str, ...]):
+    from fairhire.model_fairness import run_model_check
+
+    return run_model_check(df, attribute, target, list(features))
+
+
+def render_model_check() -> None:
+    from fairhire.model_fairness import (
+        CANDIDATE_FEATURES,
+        DEFAULT_FEATURES,
+        LABEL,
+        GuardError,
+        proxy_level,
+        summary_lines,
+    )
+
+    st.warning(f"⚠️ {LABEL}")
+    st.markdown("Train a model on **past hiring decisions** (without any demographic data) and see what it "
+                "learned: which factors drove decisions, whether any factor stands in for race or gender, and "
+                "whether the model would treat groups differently.")
+    sources = ["Demo data (referrals favor one group)"]
+    if "clean_df" in st.session_state:
+        sources.insert(0, "The file I uploaded in Hiring funnel audit")
+    src = st.radio("Data", sources, horizontal=True)
+    if src.startswith("Demo"):
+        data = generate(GeneratorConfig(n=5000, seed=42, referral_proxy=True))
+        st.caption("Demo: White applicants get referrals 5× as often, and past screeners favored referrals. "
+                   "Race is never a model input. Can the check find the proxy?")
+    else:
+        data = st.session_state["clean_df"]
+
+    c1, c2, c3 = st.columns(3)
+    attr_opts = {k: v for k, v in ATTRIBUTES.items() if v in data.columns and v != "gender_x_race_ethnicity"
+                 and data[v].nunique() > 1 and not (data[v] == "Unknown").all()}
+    attr_label = c1.selectbox("Check fairness for", list(attr_opts))
+    target = c2.selectbox("Decision to model", schema.STAGES[1:], format_func=lambda s: f"Reached '{s}'")
+    usable = [f for f in CANDIDATE_FEATURES if f in data.columns and data[f].notna().any()
+              and data[f].astype(str).nunique() > 1 and not (data[f].astype(str) == "Unknown").all()]
+    feats = c3.multiselect("Model inputs (non-demographic only)", usable,
+                           default=[f for f in DEFAULT_FEATURES if f in usable])
+    if not feats:
+        st.info("Pick at least one model input.")
+        return
+    try:
+        r = cached_model_check(data, attr_opts[attr_label], target, tuple(feats))
+    except GuardError as e:
+        st.error(f"Not enough data for a fair diagnosis: {e}")
+        return
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Applicants", f"{r.n:,}")
+    m2.metric("Model accuracy (AUC)", f"{r.auc:.2f}", help="0.5 = coin flip, 1.0 = perfect. Low means the "
+              "inputs explain little of past decisions.")
+    m3.metric("Group selection ratio", f"{r.dp_ratio:.2f}", help="Lowest group's model selection rate ÷ highest "
+              "(demographic parity ratio). Below 0.80 fails the four-fifths rule.")
+    m4.metric("Equalized odds gap", f"{r.eo_difference:.2f}", help="Largest difference between groups in "
+              "true- or false-positive rate. 0 = equal error rates.")
+
+    st.subheader("What we found")
+    for line in summary_lines(r):
+        st.markdown(f"- {line}")
+    for n in r.notes:
+        st.info(n)
+
+    st.plotly_chart(model_vs_history_chart(r.by_group, f"Who reached '{target}': past decisions vs the model"),
+                    width="stretch")
+    st.caption("Groups under 30 applicants and unknown/declined responses aren't shown. The model scores every "
+               "applicant with 5-fold cross-validation, so no one is scored by a model that saw them.")
+    left, right = st.columns(2)
+    left.plotly_chart(shap_global_chart(r.shap_global), width="stretch")
+    right.plotly_chart(shap_by_group_chart(r.shap_by_group, r.shap_global.index[0]), width="stretch")
+
+    st.subheader("Proxy scan")
+    st.caption("How strongly each model input is linked to each demographic attribute (Cramér's V or correlation "
+               "ratio, 0–1). A strong link means the input can carry demographic information into a model.")
+    prox = r.proxies.copy()
+    labels = {v: k for k, v in ATTRIBUTES.items()}
+    prox.columns = [labels.get(c, c) for c in prox.columns]
+    prox.index = [i.replace("_", " ") for i in prox.index]
+    st.dataframe(prox.map(lambda v: f"{v:.2f} · {proxy_level(v)}"), width="stretch")
+
+    if r.mitigation and "error" not in r.mitigation:
+        mm = r.mitigation
+        st.subheader("Could a fairness constraint fix it?")
+        st.markdown(f"Fairlearn's **ThresholdOptimizer** (demographic parity) changes the group selection ratio "
+                    f"from **{mm['dp_ratio_before']:.2f} → {mm['dp_ratio_after']:.2f}**, with accuracy "
+                    f"**{mm['accuracy_before']:.1%} → {mm['accuracy_after']:.1%}**.")
+        st.caption("This is a what-if, not a recommendation to deploy a model. The better fix is upstream: change "
+                   "the practice the model learned from (e.g. how referrals are weighted in screening).")
+
+    with st.expander("Full group table"):
+        st.dataframe(r.by_group.rename(columns={"actual_rate": "past_rate"}).round(3), width="stretch")
+    st.divider()
+    st.caption("Lead developer: Mridula Kalaiselvan · MIT License · " + DISCLAIMER)
+
+
 if module == MODULES[1]:
     render_jd_audit()
+    st.stop()
+if module == MODULES[2]:
+    render_model_check()
     st.stop()
 
 st.markdown(
@@ -311,6 +417,8 @@ with st.expander("3 · Data check", expanded=not report.ok or bool(report.warnin
 if not report.ok:
     st.error("Fix the issues in step 3 to see results.")
     st.stop()
+if not is_demo:
+    st.session_state["clean_df"] = df  # lets the Model fairness check reuse this upload
 
 # ---------------------------------------------------------------------------
 # Step 4: results

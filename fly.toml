@@ -1,6 +1,7 @@
 # Fly.io config. App name must be globally unique: change it if `fly launch` says it's taken.
 app = "fairhire-ai"
 primary_region = "ord"  # Chicago
+swap_size_mb = 512      # safety net for memory spikes while Module 3 trains its model
 
 [build]
 
@@ -19,6 +20,6 @@ primary_region = "ord"  # Chicago
     timeout = "5s"
 
 [[vm]]
-  memory = "512mb"   # ~240 MB used today; raise to "1gb" when Module 3 (ML) lands
+  memory = "512mb"   # ~300 MB with all 3 modules loaded (Nov 2026); raise to "1gb" if you see out-of-memory restarts
   cpu_kind = "shared"
   cpus = 1

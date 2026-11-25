@@ -153,3 +153,51 @@ def air_heatmap(full: pd.DataFrame, attribute: str) -> go.Figure:
     fig = _base_layout(fig, "Adverse impact ratio by group and step  (⚠ = adverse impact indicated)", h)
     fig.update_layout(plot_bgcolor="rgba(0,0,0,0)", margin={"t": 90})
     return fig
+
+
+# ---------------------------------------------------------------------------
+# Module 3 charts
+# ---------------------------------------------------------------------------
+
+HISTORY_GRAY = "#9a9890"
+
+
+def model_vs_history_chart(by_group: pd.DataFrame, title: str) -> go.Figure:
+    """Per group: past selection rate (gray) vs the model's selection rate (blue)."""
+    d = by_group.sort_values("actual_rate")
+    fig = go.Figure()
+    fig.add_bar(name="Past decisions", y=d.index, x=d["actual_rate"], orientation="h",
+                marker={"color": HISTORY_GRAY, "cornerradius": 4},
+                hovertemplate="<b>%{y}</b><br>Past rate %{x:.1%}<extra></extra>")
+    fig.add_bar(name="Model trained on them", y=d.index, x=d["selection_rate"], orientation="h",
+                marker={"color": CATEGORICAL[0], "cornerradius": 4},
+                customdata=d[["n"]].to_numpy(),
+                hovertemplate="<b>%{y}</b><br>Model rate %{x:.1%}<br>n = %{customdata[0]:,}<extra></extra>")
+    fig.update_layout(barmode="group", bargap=0.3, bargroupgap=0.08)
+    fig.update_xaxes(tickformat=".0%", range=[0, 1], gridcolor=GRID, title=None)
+    fig.update_yaxes(title=None)
+    return _base_layout(fig, title, height=max(300, 52 * len(d) + 140))
+
+
+def shap_global_chart(shap_global: pd.Series) -> go.Figure:
+    """Which features drove the model's decisions (mean |SHAP|), one series, largest on top."""
+    s = shap_global.sort_values()
+    fig = go.Figure(go.Bar(x=s.values, y=[i.replace("_", " ") for i in s.index], orientation="h",
+                           marker={"color": CATEGORICAL[0], "cornerradius": 4},
+                           hovertemplate="%{y}: %{x:.3f}<extra></extra>"))
+    fig.update_xaxes(gridcolor=GRID, title="Average impact on the model's score (mean |SHAP|, log-odds)")
+    fig.update_yaxes(title=None)
+    return _base_layout(fig, "What the model learned from past decisions", height=max(240, 50 * len(s) + 130))
+
+
+def shap_by_group_chart(shap_by_group: pd.DataFrame, feature: str) -> go.Figure:
+    """For one feature: average push up (blue) or down (red) on each group's score."""
+    s = shap_by_group[feature].sort_values()
+    colors = [DIVERGING[0][1] if v < 0 else DIVERGING[-1][1] for v in s.values]
+    fig = go.Figure(go.Bar(x=s.values, y=s.index, orientation="h", marker={"color": colors, "cornerradius": 4},
+                           hovertemplate="%{y}: %{x:+.3f}<extra></extra>"))
+    fig.add_vline(x=0, line_color=MUTED, line_width=1)
+    fig.update_xaxes(gridcolor=GRID, zeroline=False, title="Average push on the score (SHAP, log-odds)")
+    fig.update_yaxes(title=None)
+    return _base_layout(fig, f"How “{feature.replace('_', ' ')}” pushed each group's score",
+                        height=max(260, 48 * len(s) + 130))

@@ -176,3 +176,67 @@ The rewrite applies only the word-level swaps marked `replace:` in the YAML, suc
 - Matfield, K. Gender Decoder (MIT License). https://github.com/lovedaybrooke/gender-decoder
 - Kincaid, J. P., et al. (1975). Derivation of new readability formulas for Navy enlisted personnel. Naval Technical Training Command.
 - Illinois Department of Labor, Pay Transparency: https://labor.illinois.gov/pay
+
+---
+
+# Module 3: Model Fairness & Explainability Check (v0.3)
+
+Code: `src/fairhire/model_fairness.py`. Tests: `tests/test_model_fairness.py`. Benchmark: `scripts/benchmark_adult.py`.
+
+> **Diagnostic only.** Module 3 trains a model on past hiring decisions to show what those decisions rewarded. It is never a screening tool, and the app says so on every screen.
+
+## Question
+
+"If we trained a model on our past decisions, what would it learn, and would it treat groups differently?" More and more employers use automated screening tools, and those tools are trained on exactly this kind of history.
+
+## Method
+
+1. **Target.** The target is whether an applicant reached the chosen stage. The default is *screened*, where most automated screening happens.
+2. **Inputs.** Only non-protected columns are used as inputs: source, education level, years of experience, and optionally job title or requisition. Gender, race/ethnicity, age band and SES are **refused as inputs** and used only to measure outcomes.
+3. **Model.** LightGBM with 5-fold stratified cross-validation. Every applicant is scored by a model that never saw them (out-of-fold predictions). The threshold is set so the model selects the same share of applicants as history did.
+4. **Group metrics.** Fairlearn `MetricFrame`: selection rate, true-positive, false-positive and false-negative rate by group; demographic parity ratio and difference; equalized odds difference. Each group's model rate is shown next to its **past rate**, so you can see whether the model widens or narrows historical gaps. Plain-language comparisons use groups with 100+ applicants, because smaller groups are too noisy to summarize.
+5. **Explainability.** SHAP values come from LightGBM's built-in TreeSHAP (`pred_contrib=True`). This gives exact Shapley values for tree models with no extra package. The app shows mean |SHAP| per input (global importance) and mean SHAP per group for the top input (which groups it pushed up or down).
+6. **Proxy scan.** The scan checks how strongly each input is associated with each protected attribute:
+   - Categorical inputs: bias-corrected Cramér's V (Bergsma 2013).
+   - Numeric inputs: correlation ratio η.
+   - Non-response is excluded.
+   - Levels: ≥ 0.30 strong, ≥ 0.15 moderate, ≥ 0.05 weak.
+7. **Mitigation what-if.** Fairlearn's `ThresholdOptimizer` (demographic parity) is run cross-fitted, and the app reports the group ratio and accuracy before and after. This is shown as a what-if, not a recommendation to deploy. The better fix is to change the practice the model learned from.
+
+## Guards
+
+The check won't run unless:
+- there are at least **300 rows**, and
+- at least **2 known-response groups** each have **30 or more** applicants who reached the target stage.
+
+If the model's AUC is below 0.60, the app warns that the inputs explain little and that gaps should be read with extra caution.
+
+## Validation
+
+- **Benchmark against published results.** `scripts/benchmark_adult.py` reproduces the Fairlearn v0.9 quickstart on UCI Adult (48,842 rows). All 9 published numbers match within ±0.001, except mitigated Male (0.1708 vs 0.1715):
+  - accuracy: overall 0.8444, Female 0.9251, Male 0.8043
+  - selection rate: overall 0.1639, Female 0.0635, Male 0.2136
+  - ExponentiatedGradient selection rate: Female 0.1553, Male 0.1708
+- **Planted-proxy test.** The demo generator's `referral_proxy=True` gives White applicants referrals 5× as often and has past screeners favor referrals (×1.8 pass rate). Race is never a model input.
+
+  Module 3 finds:
+  - *source* is the top input, and a moderate proxy for race (V ≈ 0.17).
+  - SHAP for *source* is positive for White applicants and negative for every other group.
+  - The model **widens** the historical gap: among groups with 100+ applicants, the lowest-to-highest ratio goes from 0.79 to 0.72.
+  - ThresholdOptimizer moves the group ratio to about 0.82 with no accuracy loss.
+
+  **Control:** with no proxy, no input is flagged and the ratio is unchanged (0.91 → 0.91).
+
+## Limitations
+
+- Out-of-fold models approximate what a vendor model trained on this history would learn. They are not the vendor's actual model.
+- Association isn't causation. A strong proxy is a reason to examine a practice, not proof of discrimination.
+- With weak inputs (low AUC), group differences in model behavior are mostly noise.
+
+## References
+
+- Bird, S., et al. (2020). Fairlearn: A toolkit for assessing and improving fairness in AI. Microsoft Research Technical Report MSR-TR-2020-32.
+- Lundberg, S. M., et al. (2020). From local explanations to global understanding with explainable AI for trees. *Nature Machine Intelligence*, 2, 56–67.
+- Bergsma, W. (2013). A bias-correction for Cramér's V and Tschuprow's T. *Journal of the Korean Statistical Society*, 42(3), 323–328.
+- Hardt, M., Price, E., & Srebro, N. (2016). Equality of opportunity in supervised learning. *NeurIPS*.
+- Fairlearn quickstart (v0.9): https://fairlearn.org/v0.9/quickstart.html
